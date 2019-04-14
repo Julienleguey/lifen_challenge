@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import './App.css';
+import axios from 'axios';
 
 class App extends Component {
 
@@ -49,27 +50,45 @@ class App extends Component {
     e.preventDefault();
 
     let dt = '';
+    let file = '';
 
-    // if the item is dropped, its name is added to the state filesName array
+    // if the item is dropped, the uploadPdf method is called passing the file's name and the file
     if (method === "dropped") {
       dt = e.dataTransfer.files[0].name;
-      this.setState({
-        filesName: [...this.state.filesName, dt]
-      });
+      file = e.dataTransfer.files[0];
+      this.uploadPdf(dt, file);
     } else if (method === "selected") {
       // if the item is selected but the user hits the "cancel" button (otherwise, getting an error)
       if (!document.getElementById('fileElem').value.length) {
         document.body.onfocus = null;
       } else {
-        // if the item is selected, its name is added to the state filesName array
+        // if the item is selected, the uploadPdf method is called passing the file's name and the file
         dt = document.getElementById('fileElem').files.item(0).name;
-        this.setState({
-          filesName: [...this.state.filesName, dt]
-        });
+        file = document.getElementById('fileElem').files.item(0);
+        this.uploadPdf(dt, file);
       }
     }
 
   }
+
+  // method called to upload a pdf
+  uploadPdf = (dt, file) => {
+    // the file's name is added to the state in order to be displayed on the page
+    this.setState({
+      filesName: [...this.state.filesName, dt]
+    });
+    // the file is posted to the server
+    axios.post('https://fhirtest.uhn.ca/baseDstu3/Binary', file, {
+      headers: {
+        'Content-Type': 'application/pdf'
+      }
+    }).then( response => {
+      console.log(response);
+    }).catch( error => {
+      console.log(error.response);
+    })
+  }
+
 
   // method to display the names of the files uploaded by the user
   // displaying all the files name helps the user to remember which file (s)he already uploaded
@@ -78,6 +97,7 @@ class App extends Component {
     let displayed = filesNameToDisplay.map( (fileName, index) => <li key={index}>{fileName}</li>);
     return displayed;
   }
+
 
 
   render() {
@@ -104,7 +124,7 @@ class App extends Component {
             <p>OR</p>
           </div>
           <form className="my-form">
-            <input type="file" id="fileElem" accept="image/*" onChange={(e) => this.drop(e, "selected")} />
+            <input type="file" id="fileElem" accept="application/pdf" onChange={(e) => this.drop(e, "selected")} />
             <label className="button" htmlFor="fileElem">Select file</label>
           </form>
           <p className="drop-size">File size limited: 2 MB</p>
