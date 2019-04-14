@@ -277,14 +277,19 @@ html {
 
 
 #uploaded-files {
-
+  flex: 1;
 }
 
-#uploaded-files h1 {
+#uploaded-files h1, .total-binary h1 {
   font-size: 2rem;
   font-weight: 400;
 }
 
 #uploaded-files ul {
   margin-top: 20px;
+}
+
+
+.total-binary {
+  margin: 3rem;
 }

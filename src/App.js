@@ -7,7 +7,8 @@ class App extends Component {
   constructor() {
     super();
     this.state = {
-      filesName: []
+      filesName: [],
+      totalBinary: ''
     }
   }
 
@@ -73,31 +74,56 @@ class App extends Component {
 
   // method called to upload a pdf
   uploadPdf = (dt, file) => {
-    // the file's name is added to the state in order to be displayed on the page
-    this.setState({
-      filesName: [...this.state.filesName, dt]
-    });
-    // the file is posted to the server
-    axios.post('https://fhirtest.uhn.ca/baseDstu3/Binary', file, {
-      headers: {
-        'Content-Type': 'application/pdf'
-      }
-    }).then( response => {
-      console.log(response);
-    }).catch( error => {
-      console.log(error.response);
-    })
+
+      // the file's name is added to the state in order to be displayed on the page
+      this.setState({
+        filesName: [...this.state.filesName, dt]
+      });
+
+      // the file is posted to the server
+      axios.post('https://fhirtest.uhn.ca/baseDstu3/Binary', file, {
+        headers: {
+          'Content-Type': 'application/pdf'
+        }
+      }).then( response => {
+        console.log(response);
+        // getting the total number of Binary on the server
+        // see here: https://www.hl7.org/fhir/search.html#summary
+        return axios.get('https://fhirtest.uhn.ca/baseDstu3/Binary?_summary=count');
+      }).then(response => {
+        console.log(response.data.total);
+        // updating the total number of Binary in the state
+        this.setState({
+          totalBinary: response.data.total
+        })
+      }).catch( error => {
+        console.log(error.response);
+      })
+
   }
 
 
   // method to display the names of the files uploaded by the user
   // displaying all the files name helps the user to remember which file (s)he already uploaded
-  display = () => {
+  displayFilesName = () => {
     let filesNameToDisplay = this.state.filesName;
     let displayed = filesNameToDisplay.map( (fileName, index) => <li key={index}>{fileName}</li>);
     return displayed;
   }
 
+
+  // method to display the total number of Binary on the server
+  // that div is only displayed after a file has been succesfully uploaded
+  displayTotalBinary = () => {
+
+    let totalBinaryDiv = <div className="total-binary">
+      <h1>Total number of Binary: {this.state.totalBinary}</h1>
+    </div>;
+
+    if (this.state.totalBinary !== '') {
+      return totalBinaryDiv;
+    }
+  }
 
 
   render() {
@@ -132,9 +158,10 @@ class App extends Component {
         <div id="uploaded-files">
           <h1>Uploaded files:</h1>
           <ul>
-            {this.display()}
+            {this.displayFilesName()}
           </ul>
         </div>
+        {this.displayTotalBinary()}
       </div>
     );
   }
