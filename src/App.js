@@ -2,10 +2,15 @@ import React, { Component } from 'react';
 import './App.css';
 import axios from 'axios';
 
+// importing images
+import checked from './images/checked.png';
+import warning from './images/warning.png';
+
 // useful to communicate with Electron
 // can't use the React app with a web browser while using this
 const electron = window.require('electron');
 const ipcRenderer = electron.ipcRenderer;
+
 
 
 class App extends Component {
@@ -13,8 +18,10 @@ class App extends Component {
   constructor() {
     super();
     this.state = {
-      filesName: [],
-      totalBinary: ''
+      submittedFiles: [],
+      totalBinary: '',
+      typeOk: ["application/pdf", ".pdf"],
+      sizeOk: 2000000 // limit: 2 Mo
     }
   }
 
@@ -28,9 +35,9 @@ class App extends Component {
       e.preventDefault();
     });
 
-    // trying to communicate from Electron to React
-    ipcRenderer.on("ping", (event, truc) => {
-      console.log(truc);
+    // listening for changes in the folder (from Electron)
+    ipcRenderer.on('upload', (event, fileName, fileType, fileSize, file) => {
+      this.controlPdf(fileName, fileType, fileSize, file);
     });
 
   }
@@ -48,12 +55,16 @@ class App extends Component {
   dragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // adding a class while hovering over the drop area
+    document.getElementById('drop-area').classList.add('drag-enter');
   }
 
   // when the dragged item leaves the droparea, the droparea is not the drop target anymore
   dragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // removing the class when leaving the drop area
+    document.getElementById('drop-area').classList.remove('drag-enter');
   }
 
   // dropping the dragged item
@@ -61,65 +72,95 @@ class App extends Component {
   drop = (e, method) => {
     e.preventDefault();
 
-    let dt = '';
-    let file = '';
+    // removing the class when leaving the drop area
+    document.getElementById('drop-area').classList.remove('drag-enter');
 
-    // if the item is dropped, the uploadPdf method is called passing the file's name and the file
+    // if the item is dropped, the controlPdf method is called passing the file's name and the file
     if (method === "dropped") {
-      dt = e.dataTransfer.files[0].name;
-      file = e.dataTransfer.files[0];
-      this.uploadPdf(dt, file);
+      // iterating through the dropped files to send them one by one
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const fileName = e.dataTransfer.files[i].name;
+        const fileType = e.dataTransfer.files[i].type;
+        const fileSize = e.dataTransfer.files[i].size;
+        const file = e.dataTransfer.files[i];
+
+        this.controlPdf(fileName, fileType, fileSize, file);
+      }
     } else if (method === "selected") {
       // if the item is selected but the user hits the "cancel" button (otherwise, getting an error)
       if (!document.getElementById('fileElem').value.length) {
         document.body.onfocus = null;
       } else {
-        // if the item is selected, the uploadPdf method is called passing the file's name and the file
-        dt = document.getElementById('fileElem').files.item(0).name;
-        file = document.getElementById('fileElem').files.item(0);
-        this.uploadPdf(dt, file);
+        // if the item is selected, the controlPdf method is called passing the file's name and the file
+        // iterating through the dropped files to send them one by one
+        for (let i = 0; i < document.getElementById('fileElem').files.length; i++ ) {
+          const fileName = document.getElementById('fileElem').files.item(i).name;
+          const fileType = document.getElementById('fileElem').files.item(i).type;
+          const fileSize = document.getElementById('fileElem').files.item(i).size;
+          const file = document.getElementById('fileElem').files.item(i);
+
+          this.controlPdf(fileName, fileType, fileSize, file);
+        }
       }
     }
+  }
+
+
+  // method to control that the file is a pdf with a size < 2 Mo
+  controlPdf = (fileName, fileType, fileSize, file) => {
+
+      if (!this.state.typeOk.includes(fileType)) {
+        // listing the file with the result of the control
+        this.setState(previousState => ({
+          submittedFiles: [...previousState.submittedFiles, {name: fileName, control: "This file is not a pdf!"}]
+        }));
+      } else if (fileSize > this.state.sizeOk){
+        // listing the file with the result of the control
+        this.setState(previousState => ({
+          submittedFiles: [...previousState.submittedFiles, {name: fileName, control: "This file is too big!"}]
+        }));
+      } else {
+        // all the controls are passed, the file can be uploaded
+        this.uploadPdf(fileName, file);
+      }
 
   }
 
   // method called to upload a pdf
-  uploadPdf = (dt, file) => {
-
-      // the file's name is added to the state in order to be displayed on the page
-      this.setState({
-        filesName: [...this.state.filesName, dt]
-      });
-
-      // the file is posted to the server
-      axios.post('https://fhirtest.uhn.ca/baseDstu3/Binary', file, {
-        headers: {
-          'Content-Type': 'application/pdf'
-        }
-      }).then( response => {
-        console.log(response);
-        // getting the total number of Binary on the server
-        // see here: https://www.hl7.org/fhir/search.html#summary
-        return axios.get('https://fhirtest.uhn.ca/baseDstu3/Binary?_summary=count');
-      }).then(response => {
-        console.log(response.data.total);
-        // updating the total number of Binary in the state
-        this.setState({
-          totalBinary: response.data.total
-        })
-      }).catch( error => {
-        console.log(error.response);
-      })
-
+  uploadPdf = (fileName, file) => {
+    // the file is posted to the server
+    axios.post('https://fhirtest.uhn.ca/baseDstu3/Binary', file, {
+      headers: {
+        'Content-Type': 'application/pdf'
+      }
+    }).then( response => {
+      // getting the total number of Binary on the server
+      // see here: https://www.hl7.org/fhir/search.html#summary
+      return axios.get('https://fhirtest.uhn.ca/baseDstu3/Binary?_summary=count');
+    }).then(response => {
+      // listing the file with the result of the control
+      // updating the total number of Binary in the state
+      this.setState(previousState => ({
+        submittedFiles: [...previousState.submittedFiles, {name: fileName, control: "Ok"}],
+        totalBinary: response.data.total
+      }));
+    }).catch( error => {
+      // listing the file and an error message
+      this.setState(previousState => ({
+        submittedFiles: [...previousState.submittedFiles, {name: fileName, control: "An error occured on the server!"}]
+      }));
+    })
   }
 
 
   // method to display the names of the files uploaded by the user
   // displaying all the files name helps the user to remember which file (s)he already uploaded
   displayFilesName = () => {
-    let filesNameToDisplay = this.state.filesName;
+    let filesNameToDisplay = this.state.submittedFiles;
     let displayed = filesNameToDisplay.map( (fileName, index) => <li key={index}>
-      {fileName}
+      {fileName.name}
+      {fileName.control === "Ok"? <img src={checked} className="check-warning-logo"/> : <img src={warning} className="check-warning-logo"/>}
+      {fileName.control !== "Ok"? <p className="upload-error">{fileName.control}</p> : null}
       </li>);
     return displayed;
   }
@@ -142,7 +183,9 @@ class App extends Component {
   render() {
     return (
       <div className="App" id="app">
-        <div id="drop-area" onDragEnter={ (e) => this.dragEnter(e)} onDragOver={ (e) => this.dragOver(e)} onDragLeave={ (e) => this.dragLeave(e)} onDrop={ (e) => this.drop(e, "dropped")}>
+        <div id="drop-area" style={this.state.dropAreaStyle} onDragEnter={ (e) => this.dragEnter(e)} onDragOver={ (e) => this.dragOver(e)} onDragLeave={ (e) => this.dragLeave(e)} onDrop={ (e) => this.drop(e, "dropped")}>
+        {/*<div id="drop-area" style={{backgroundColor: 'blue', cursor: 'grab'}} onDragEnter={ (e) => this.dragEnter(e)} onDragOver={ (e) => this.dragOver(e)} onDragLeave={ (e) => this.dragLeave(e)} onDrop={ (e) => this.drop(e, "dropped")}>*/}
+
           <svg className="upload-svg" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
           	 viewBox="0 0 548.176 548.176" style={{"enableBackground":"new 0 0 548.176 548.176"}}
           	 xmlSpace="preserve">
@@ -158,15 +201,15 @@ class App extends Component {
           		c1.713-1.714,3.903-2.57,6.567-2.57c2.666,0,4.856,0.856,6.567,2.57l100.499,100.495c1.714,1.712,2.562,3.901,2.562,6.571
           		C365.438,285.696,364.535,287.845,362.729,289.648z"/>
           </svg>
-          <div className="drop-description" droppable="false">
+          <div className="drop-description">
             <p>Drag and drop your file here</p>
             <p>OR</p>
           </div>
           <form className="my-form">
-            <input type="file" id="fileElem" accept="application/pdf" onChange={(e) => this.drop(e, "selected")} />
+            <input type="file" id="fileElem" accept="application/pdf" multiple={true} onChange={(e) => this.drop(e, "selected")} />
             <label className="button" htmlFor="fileElem">Select file</label>
           </form>
-          <p className="drop-size">File size limited: 2 MB</p>
+          <p className="drop-size">File size limit: 2 Mo</p>
         </div>
         <div id="uploaded-files">
           <h1>Uploaded files:</h1>

@@ -20,12 +20,16 @@ html {
 #drop-area {
   display: flex;
   flex-direction: column;
-  /* justify-content: center; */
   border: 2px dashed #fff;
   border-radius: 20px;
   margin: 20px;
   height: 50%;
   background-color: #ff6742;
+  transition: all 0.5s;
+}
+
+.drag-enter {
+  background-color: #3f62b5 !important;
 }
 
 .upload-svg {
@@ -73,6 +77,8 @@ html {
 
 #uploaded-files {
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 #uploaded-files h1, .total-binary h1 {
@@ -81,9 +87,24 @@ html {
 }
 
 #uploaded-files ul {
-  margin-top: 20px;
+  margin: 20px auto 0 auto;
+  width: 50%;
+  text-align: left;
 }
 
+#uploaded-files li {
+  display: flex;
+  flex-direction: row;
+}
+
+.check-warning-logo {
+  height: 25px;
+  margin: 0 10px;
+}
+
+.upload-error {
+  color: red;
+}
 
 .total-binary {
   margin: 3rem;
