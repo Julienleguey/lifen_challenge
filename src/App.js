@@ -2,6 +2,12 @@ import React, { Component } from 'react';
 import './App.css';
 import axios from 'axios';
 
+// useful to communicate with Electron
+// can't use the React app with a web browser while using this
+const electron = window.require('electron');
+const ipcRenderer = electron.ipcRenderer;
+
+
 class App extends Component {
 
   constructor() {
@@ -20,6 +26,11 @@ class App extends Component {
     });
     window.addEventListener("drop", (e) => {
       e.preventDefault();
+    });
+
+    // trying to communicate from Electron to React
+    ipcRenderer.on("ping", (event, truc) => {
+      console.log(truc);
     });
 
   }
@@ -107,7 +118,9 @@ class App extends Component {
   // displaying all the files name helps the user to remember which file (s)he already uploaded
   displayFilesName = () => {
     let filesNameToDisplay = this.state.filesName;
-    let displayed = filesNameToDisplay.map( (fileName, index) => <li key={index}>{fileName}</li>);
+    let displayed = filesNameToDisplay.map( (fileName, index) => <li key={index}>
+      {fileName}
+      </li>);
     return displayed;
   }
 
